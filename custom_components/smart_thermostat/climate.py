@@ -241,6 +241,7 @@ def _create_controllers(
         if domain in [SWITCH_DOMAIN, INPUT_BOOLEAN_DOMAIN]:
             if CONF_PID_PARAMS in conf:
                 pid_params = conf[CONF_PID_PARAMS]
+                _LOGGER.info(f"creating PwmSwitchPidController with domain `{domain}`")
 
                 controller = PwmSwitchPidController(
                     name,
@@ -277,6 +278,7 @@ def _create_controllers(
                         entity_id
                     )
 
+                _LOGGER.info(f"creating SwitchController with domain `{domain}`")
                 controller = SwitchController(
                     name,
                     mode,
@@ -291,6 +293,7 @@ def _create_controllers(
         elif domain in [INPUT_NUMBER_DOMAIN, NUMBER_DOMAIN]:
             pid_params = conf[CONF_PID_PARAMS]
 
+            _LOGGER.info(f"creating NumberPidController with domain `{domain}`")
             controller = NumberPidController(
                 name,
                 mode,
@@ -308,6 +311,7 @@ def _create_controllers(
         elif domain in [CLIMATE_DOMAIN]:
             pid_params = conf[CONF_PID_PARAMS]
 
+            _LOGGER.info(f"creating ClimatePidController with domain `{domain}`")
             controller = ClimatePidController(
                 name,
                 mode,
@@ -453,12 +457,10 @@ class SmartThermostat(ClimateEntity, RestoreEntity, Thermostat):
 
         for controller in self._controllers:
             controller.set_thermostat(self)
-            if controller.mode == HVACMode.HEAT and HVACMode.HEAT not in self._hvac_list:
-                self._hvac_list.append(HVACMode.HEAT)
-            elif controller.mode == HVACMode.COOL and HVACMode.COOL not in self._hvac_list:
-                self._hvac_list.append(HVACMode.COOL)
+            if (controller.mode in [HVACMode.HEAT, HVACMode.COOL]) and (controller.mode not in self._hvac_list):
+                self._hvac_list.append(controller.mode)
 
-        if (HVACMode.COOL in self._hvac_list and HVACMode.HEAT in self._hvac_list) and not heat_cool_disabled:
+        if (HVACMode.COOL in self._hvac_list) and (HVACMode.HEAT in self._hvac_list) and not heat_cool_disabled:
             self._hvac_list.append(HVACMode.HEAT_COOL)
 
     async def async_added_to_hass(self):
@@ -511,12 +513,12 @@ class SmartThermostat(ClimateEntity, RestoreEntity, Thermostat):
         else:
             self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_START, _async_startup)
 
-        # Check If we have an old state
+        # Check if we have an old state
         old_state = await self.async_get_last_state()
         if old_state is not None:
-            # If we have no initial temperature, restore
+            # if we have no initial temperature, restore
             if self._target_temp is None:
-                # If we have a previously saved temperature
+                # if we have a previously saved temperature
                 if old_state.attributes.get(ATTR_TEMPERATURE) is None:
                     self._target_temp = self._get_default_target_temp()
                     _LOGGER.warning(
@@ -533,7 +535,7 @@ class SmartThermostat(ClimateEntity, RestoreEntity, Thermostat):
             self._last_async_control_hvac_mode = old_state.attributes.get(ATTR_LAST_ASYNC_CONTROL_HVAC_MODE)
 
         else:
-            # No previous state, try and restore defaults
+            # no previous state, try and restore defaults
             self._target_temp = self._get_default_target_temp()
             _LOGGER.warning(
                 "%s: No previously saved temperature, setting to %s", self.name, self._target_temp
